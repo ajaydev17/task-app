@@ -2,6 +2,8 @@
 const mongoose = require('mongoose');
 const validator = require('validator');
 const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
+const Task = require('./task');
 
 // define the user schema
 const userSchema = new mongoose.Schema({
@@ -41,13 +43,59 @@ const userSchema = new mongoose.Schema({
                 throw new Error('Age must be a positive integer');
             }
         }
-    }
+    },
+    loggedIn: {
+        type: Boolean,
+        default: false
+    },
+    tokens: [{
+        token: {
+            type: String,
+            required: true
+        }
+    }]
+});
+
+// defination of the virtual schema on the task model (virtual schema is not stored in the database but its attached to respective document)
+userSchema.virtual('tasks', {
+    ref: 'Task',
+    localField: '_id',
+    foreignField: 'owner'
 });
 
 // define an index on the "email" field
 userSchema.index({ email: 1 }, { unique: true });
 
-// define the custom function that can be attached to a collection
+// methods will be applied on the instance of the schema/model
+
+// defination of toJSON method which will be called on the instance of the schema when the data is stringified and sent
+userSchema.methods.toJSON = function () {
+    const user = this;
+
+    const userObject = user.toObject();
+
+    // deleting the properties so that it will not be show in the response body
+    delete userObject.password;
+    delete userObject.tokens;
+
+    return userObject;
+};
+
+// defination of the method for token generation
+userSchema.methods.generateAuthToken = async function () {
+    const user = this;
+    // jws token creation with a secret key, its base64 encoded string with header, payload, signature info
+    const token = jwt.sign({ _id: user._id.toString() }, "thisisanewtoken");
+
+    // add token to user data
+    user.tokens = user.tokens.concat({ token });
+    await user.save();
+    return token;
+};
+
+
+// statics will be applied on the schema/model itself.
+// defination of the custom function that can be attached to a schema, no need to create the instance
 userSchema.statics.findByCredentials = async (email, password) => {
     const user = await User.findOne({ email: email });
 
@@ -72,6 +120,14 @@ userSchema.pre('save', async function (next) {
         user.password = await bcrypt.hash(user.password, 8);
     }
 
+    next();
+});
+
+// defination of the middleware for remove user
+userSchema.pre('deleteOne', { document: true }, async function (next) {
+    const user = this;
+
+    await Task.deleteMany({ owner: user._id });
     next();
 });
 
