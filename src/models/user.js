@@ -53,8 +53,11 @@ const userSchema = new mongoose.Schema({
             type: String,
             required: true
         }
-    }]
-});
+    }],
+    avatar: {
+        type: Buffer
+    }
+}, { timestamp: true });
 
 // defination of the virtual schema on the task model (virtual schema is not stored in the database but its attached to respective document)
 userSchema.virtual('tasks', {
