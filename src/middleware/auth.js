@@ -6,7 +6,7 @@ const auth = async (req, res, next) => {
         // get the token passed in the header of the request
         const token = req.header('Authorization').replace('Bearer ', '');
         // get the base64 decoded value from the token
-        const decoded = jwt.verify(token, 'thisisanewtoken');
+        const decoded = jwt.verify(token, process.env.JWT_TOKEN);
 
         // get the user info using the token values
         const user = await User.findOne({ _id: decoded._id, 'tokens.token': token, loggedIn: true });
